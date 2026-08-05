@@ -32,25 +32,25 @@ class NetCat:
         self.socket.connect((self.args.target, self.args.port)) #connect to the specified target and port
         if self.buffer:
             self.socket.send(self.buffer) #send the buffer to the connected socket
-            try:
-                while True:
-                    recv_len = 1 #initialize the length of received data to 1
-                    responce = '' #initialize the response to an empty string
-                    while recv_len: #while recv_len is not zero, keep receiving data
-                        data = self.socket.recv(4096) #receive up to 4096 bytes of data from the socket
-                        recv_len=len(data) #update recv_len to the length of the received data
-                        responce += data.decode() #decode the received data and append it to the response string
-                        if recv_len<4096: #if the length of received data is less than 4096, break the loop
-                            break
-                    if responce: #if there is a response, print it
-                        print(responce) #print the response
-                        buffer = input('> ') #prompt the user for input and store it in buffer
-                        buffer += '\n' #add a newline character to the buffer
-                        self.socket.send(buffer.encode()) #send the encoded buffer to the socket
-            except KeyboardInterrupt: #if a keyboard interrupt is detected, close the socket and exit
-                print('User terminated.')
-                self.socket.close() #close the socket
-                sys.exit() #exit the program
+        try:
+            while True:
+                recv_len = 1 #initialize the length of received data to 1
+                responce = '' #initialize the response to an empty string
+                while recv_len: #while recv_len is not zero, keep receiving data
+                    data = self.socket.recv(4096) #receive up to 4096 bytes of data from the socket
+                    recv_len=len(data) #update recv_len to the length of the received data
+                    responce += data.decode() #decode the received data and append it to the response string
+                    if recv_len<4096: #if the length of received data is less than 4096, break the loop
+                        break
+                if responce: #if there is a response, print it
+                    print(responce) #print the response
+                    buffer = input('> ') #prompt the user for input and store it in buffer
+                    buffer += '\n' #add a newline character to the buffer
+                    self.socket.send(buffer.encode()) #send the encoded buffer to the socket
+        except KeyboardInterrupt: #if a keyboard interrupt is detected, close the socket and exit
+            print('User terminated.')
+            self.socket.close() #close the socket
+            sys.exit() #exit the program
 
     def listen(self):
         self.socket.bind((self.args.target, self.args.port)) #bind the socket to the specified target and port
@@ -80,7 +80,7 @@ class NetCat:
             cmd_buffer = b'' #initialize an empty byte string to store the command data
             while True:
                 try:
-                    client_socket.send(b'BHP: #> ') #send a prompt to the client
+                    client_socket.send(b'N: #> ') #send a prompt to the client
                     while '\n' not in cmd_buffer.decode(): #while there is no newline character in the command buffer, keep receiving data
                         cmd_buffer += client_socket.recv(64) #receive up to 64 bytes of data from the client and append it to the command buffer
                     response = execute(cmd_buffer.decode()) #execute the command in the command buffer and store the response
