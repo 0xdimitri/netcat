@@ -8,11 +8,14 @@ import textwrap
 import threading
 
 def execute(cmd):
-    cmd = cmd.strip() #remove leading and trailing whitespace
-    if not cmd: #if command is empty
+    cmd = cmd.strip()
+    if not cmd:
         return
-    output = subprocess.check_output(shlex.split(cmd), stderr=subprocess.STDOUT) #shlex.split(): safely parses the command string into a list formatted for OS execution and stderr=subprocess.STDOUT: forces error output into the same string stream as standard output.
-    return output.decode() #return decoded output
+    try:
+        output = subprocess.check_output(shlex.split(cmd), stderr=subprocess.STDOUT)
+        return output.decode()
+    except Exception as e:
+        return f"Command execution failed: {str(e)}\n"
 
 class NetCat:
 
@@ -77,20 +80,20 @@ class NetCat:
             message = f'saved file {self.args.upload}' #create a message indicating that the file has been saved
             client_socket.send(message.encode()) #send the encoded message to the client socket
         elif self.args.command: 
-            cmd_buffer = b'' #initialize an empty byte string to store the command data
+            cmd_buffer = b''
             while True:
                 try:
-                    client_socket.send(b'N: #> ') #send a prompt to the client
-                    while '\n' not in cmd_buffer.decode(): #while there is no newline character in the command buffer, keep receiving data
-                        cmd_buffer += client_socket.recv(64) #receive up to 64 bytes of data from the client and append it to the command buffer
-                    response = execute(cmd_buffer.decode()) #execute the command in the command buffer and store the response
-                    if response: #if there is a response, send it back to the client
+                    client_socket.send(b'NC: #> ')
+                    while '\n' not in cmd_buffer.decode():
+                        cmd_buffer += client_socket.recv(64)
+                    response = execute(cmd_buffer.decode())
+                    if response:
                         client_socket.send(response.encode())
-                    cmd_buffer = b'' #reset the command buffer to an empty byte string
-                except Exception as e: #if an exception occurs, print an error message and break the loop
-                    print(f'server killed {e}')
-                    self.socket.close() #close the socket
-                    sys.exit() #exit the program
+                    cmd_buffer = b''
+                except Exception as e:
+                    print(f'Client connection dropped: {e}')
+                    client_socket.close() # Close the specific client socket, not the main listener
+                    break # Break the loop to cleanly exit the thread instead of killing the server
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
