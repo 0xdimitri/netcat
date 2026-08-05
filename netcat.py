@@ -14,6 +14,84 @@ def execute(cmd):
     output = subprocess.check_output(shlex.split(cmd), stderr=subprocess.STDOUT) #shlex.split(): safely parses the command string into a list formatted for OS execution and stderr=subprocess.STDOUT: forces error output into the same string stream as standard output.
     return output.decode() #return decoded output
 
+class NetCat:
+
+    def __init__(self, args, buffer=None):
+        self.args= args #store the parsed arguments in the instance variable
+        self.buffer = buffer #store the buffer in the instance variable
+        self.socket= socket.socket(socket.AF_INET, socket.SOCK_STREAM) #create a TCP socket using IPv4 addressing
+        self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1) #set the socket option to allow reuse of local addresses
+
+    def run(self):
+        if self.args.listen:
+            self.listen() #if listen flag is set, call the listen method
+        else:
+            self.send() #if listen flag is not set, call the send method
+
+    def send(self):
+        self.socket.connect((self.args.target, self.args.port)) #connect to the specified target and port
+        if self.buffer:
+            self.socket.send(self.buffer) #send the buffer to the connected socket
+            try:
+                while True:
+                    recv_len = 1 #initialize the length of received data to 1
+                    responce = '' #initialize the response to an empty string
+                    while recv_len: #while recv_len is not zero, keep receiving data
+                        data = self.socket.recv(4096) #receive up to 4096 bytes of data from the socket
+                        recv_len=len(data) #update recv_len to the length of the received data
+                        responce += data.decode() #decode the received data and append it to the response string
+                        if recv_len<4096: #if the length of received data is less than 4096, break the loop
+                            break
+                    if responce: #if there is a response, print it
+                        print(responce) #print the response
+                        buffer = input('> ') #prompt the user for input and store it in buffer
+                        buffer += '\n' #add a newline character to the buffer
+                        self.socket.send(buffer.encode()) #send the encoded buffer to the socket
+            except KeyboardInterrupt: #if a keyboard interrupt is detected, close the socket and exit
+                print('User terminated.')
+                self.socket.close() #close the socket
+                sys.exit() #exit the program
+
+    def listen(self):
+        self.socket.bind((self.args.target, self.args.port)) #bind the socket to the specified target and port
+        self.socket.listen(5) #listen for incoming connections with a backlog of 5
+        while True:
+            client_socket, _ = self.socket.accept() #accept an incoming connection and get the client socketz
+            client_thread= threading.Thread(target=self.handle, args=(client_socket,)) #create a new thread to handle the client connection
+            client_thread.start() #start the client thread
+
+    def handle(self, client_socket): 
+        if self.args.execute: #if the execute flag is set, execute the specified command and send the output to the client socket
+            output = execute(self.args.execute) #execute the command specified in the execute argument and store the output
+            client_socket.send(output.encode()) #send the encoded output to the client socket   
+        elif self.args.upload: #if the upload flag is set, receive the file data from the client socket and save it to the specified file
+            file_buffer = b'' #initialize an empty byte string to store the file data
+            while True: 
+                data = client_socket.recv(4096) #receive up to 4096 bytes of data from the client socket
+                if data:
+                    file_buffer+= data
+                else:
+                    break
+            with open(self.args.upload, 'wb') as f: #open the specified file in write-binary mode and save the received file data to it
+                f.write(file_buffer) #write the received file data to the specified file
+            message = f'saved file {self.args.upload}' #create a message indicating that the file has been saved
+            client_socket.send(message.encode()) #send the encoded message to the client socket
+        elif self.args.command: 
+            cmd_buffer = b'' #initialize an empty byte string to store the command data
+            while True:
+                try:
+                    client_socket.send(b'BHP: #> ') #send a prompt to the client
+                    while '\n' not in cmd_buffer.decode(): #while there is no newline character in the command buffer, keep receiving data
+                        cmd_buffer += client_socket.recv(64) #receive up to 64 bytes of data from the client and append it to the command buffer
+                    response = execute(cmd_buffer.decode()) #execute the command in the command buffer and store the response
+                    if response: #if there is a response, send it back to the client
+                        client_socket.send(response.encode())
+                    cmd_buffer = b'' #reset the command buffer to an empty byte string
+                except Exception as e: #if an exception occurs, print an error message and break the loop
+                    print(f'server killed {e}')
+                    self.socket.close() #close the socket
+                    sys.exit() #exit the program
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description='python netcat',
