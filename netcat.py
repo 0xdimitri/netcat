@@ -38,15 +38,15 @@ class NetCat:
         try:
             while True:
                 recv_len = 1 #initialize the length of received data to 1
-                responce = '' #initialize the response to an empty string
+                response = '' #initialize the response to an empty string
                 while recv_len: #while recv_len is not zero, keep receiving data
                     data = self.socket.recv(4096) #receive up to 4096 bytes of data from the socket
                     recv_len=len(data) #update recv_len to the length of the received data
-                    responce += data.decode() #decode the received data and append it to the response string
+                    response += data.decode() #decode the received data and append it to the response string
                     if recv_len<4096: #if the length of received data is less than 4096, break the loop
                         break
-                if responce: #if there is a response, print it
-                    print(responce) #print the response
+                if response: #if there is a response, print it
+                    print(response, end='', flush=True) #print the response
                     buffer = input('> ') #prompt the user for input and store it in buffer
                     buffer += '\n' #add a newline character to the buffer
                     self.socket.send(buffer.encode()) #send the encoded buffer to the socket
@@ -81,19 +81,20 @@ class NetCat:
             client_socket.send(message.encode()) #send the encoded message to the client socket
         elif self.args.command: 
             cmd_buffer = b''
+            client_socket.send(b'NC: #> ')
             while True:
                 try:
-                    client_socket.send(b'NC: #> ')
                     while '\n' not in cmd_buffer.decode():
                         cmd_buffer += client_socket.recv(64)
                     response = execute(cmd_buffer.decode())
                     if response:
                         client_socket.send(response.encode())
+                    client_socket.send(b'NC: #> ')
                     cmd_buffer = b''
                 except Exception as e:
                     print(f'Client connection dropped: {e}')
-                    client_socket.close() # Close the specific client socket, not the main listener
-                    break # Break the loop to cleanly exit the thread instead of killing the server
+                    client_socket.close()
+                    break
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
